@@ -1,4 +1,4 @@
-* django-autoajax
+# django-autoajax
 
 AutoAjax tries to further reduce the amount of code required to
 implement AJAX form fields in Django. The key feature is automatic
@@ -7,7 +7,7 @@ generation of Django views.
 This is still in pretty early stages, so it will probably error
 on you.
 
-** Installation
+## Installation
 
 Installation is via the usual `setup.py` channels:
 
@@ -23,10 +23,11 @@ INSTALLED_APPS = [
   ...
   'autoajax',
 ]
+```
 
 For the client-side you will need jQuery available in your templates.
 
-** Form fields
+## Form fields
 
 Currently there is only one useful form field available,
 `DependentModelChoiceField`. This field allows a form to create
@@ -34,7 +35,7 @@ a field that loads its choices dynamically from the server
 dependent on the selection of another field. Currently the
 independent field must also be a model field.
 
-*** Creating the form
+### Creating the form
 
 Suppose we have two simple models:
 
@@ -76,7 +77,7 @@ urlpatterns = [
 ]
 ```
 
-*** Usage in templates
+### Usage in templates
 
 To use the form we only need to make sure we include the media:
 
