@@ -13,8 +13,7 @@ class AutoAjaxSite(object):
             form_name = form_cls.__name__.lower()
             path = 'autoajax/' + '/'.join([app.name, form_name, field_name])
             urls.append(url('^%s$'%path, field.as_view()))
-            if isinstance(field.widget, DependentSelect):
-                field.widget.attrs['data-url'] = '/' + path
+            field.widget.attrs['data-url'] = '/' + path
         self._urls = urls
 
     @property

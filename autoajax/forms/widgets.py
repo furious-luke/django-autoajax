@@ -12,7 +12,6 @@ class DependentSelect(forms.Select):
         attrs = kwargs.setdefault('attrs', {})
         attrs['class'] = (' ' if attrs.get('class', '') else '') + 'autoajax'
         attrs['data-parent-field'] = parent
-        attrs['data-url'] = 'NOTHING'
         attrs['data-observables'] = ','.join(kwargs.pop('observables', []))
         super(DependentSelect, self).__init__(*args, **kwargs)
 

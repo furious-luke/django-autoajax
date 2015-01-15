@@ -1,3 +1,4 @@
+import inspect
 import simplejson as json
 from importlib import import_module
 from django import forms
@@ -6,6 +7,8 @@ from django.utils.html import escapejs
 from django.utils.translation import ugettext_lazy as _
 from django_ajax.decorators import ajax
 from .widgets import *
+
+import time
 
 __all__ = ['AutoAjaxField', 'DependentModelChoiceField', 'ObservableModelChoiceField',
            'AutoAjaxFormMixin']
@@ -26,6 +29,7 @@ class AutoAjaxField(object):
 
         @ajax
         def view(request, *args, **kwargs):
+            time.sleep(1);
             pk = request.GET.get('pk', None)
             if pk is None:
                 raise Http404
@@ -55,7 +59,7 @@ class DependentModelChoiceField(AutoAjaxField, forms.ModelChoiceField):
     def __init__(self, *args, **kwargs):
         self.model = kwargs.pop('model')
         self.parent = kwargs.pop('parent')
-        self.observables = kwargs.pop('observables', '')
+        self.observables = kwargs.pop('observables', [])
         self.decorators = kwargs.pop('decorators', [])
         self.filter = kwargs.pop('filter', None)
         if self.filter is None:
@@ -63,7 +67,16 @@ class DependentModelChoiceField(AutoAjaxField, forms.ModelChoiceField):
         self.label_field = kwargs.pop('label_field', None)
         kwargs['queryset'] = self.model.objects.none()
         kwargs['empty_label'] = None
-        kwargs['widget'] = DependentSelect(self.parent, observables=self.observables)
+        widget = kwargs.get('widget', None)
+        if widget:
+            if inspect.isclass(widget):
+                widget = widget()
+            widget.attrs['class'] = ' '.join(widget.attrs.get('class', '').split() + ['autoajax'])
+            widget.attrs['data-parent-field'] = self.parent
+            widget.attrs['data-observables'] = ','.join(widget.attrs.get('observables', []) + self.observables)
+            kwargs['widget'] = widget
+        else:
+            kwargs['widget'] = DependentSelect(self.parent, observables=self.observables)
         super(DependentModelChoiceField, self).__init__(*args, **kwargs)
 
     def to_python(self, value):

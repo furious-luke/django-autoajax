@@ -1,5 +1,23 @@
 (function($, undefined){
 
+    var set_options_knockout = function($this, data, content) {
+	var opts = $.map(content, function(obj) {
+            var opt = {
+		text: obj.label,
+		value: obj.pk,
+		attrs: []
+	    };
+            if(obj.hasOwnProperty('observables')) {
+	    	opt.attrs.push({
+	    	    name: 'data-observables',
+	    	    value: obj.observables
+	    	});
+	    }
+	    return opt;
+        });
+	data.options_obs(opts);
+    }
+
     var methods = {
 
  	///
@@ -18,7 +36,8 @@
                         url: undefined,
                         disabled: 0,
                         event_set: false,
-                        vm: {}
+                        vm: {},
+			local_vm: {}
 	            }, options));
 	            data = $this.data('autoajax');
 
@@ -29,10 +48,8 @@
                     var obs = $this.attr('data-observables');
                     if(obs) {
                         obs = obs.split(',');
-                        for(var ii = 0; ii < obs.length; ++ii) {
+                        for(var ii = 0; ii < obs.length; ++ii)
                             data.vm[$.trim(obs[ii])] = ko.observable();
-                            // console.log('Adding observable "' + obs[ii] + '" to "' + $this.attr('id'));
-                        }
                     }
 
                     // Find the parent field.
@@ -44,10 +61,8 @@
                             par = next.find('[id$="' + par_name + '"]');
                             next = next.parent();
                         } while(par.length == 0 && next.length > 0);
-                        if(par === undefined) {
-                            console.error('Parent not found: ' + par_name);
-                            return;
-                        }
+                        if(par === undefined)
+		    	    throw 'Parent not found: ' + par_name;
                         data.parent = par;
 
                         // Before continuing, make sure our parent is constructed.
@@ -56,15 +71,25 @@
                         // Add myself as a child of the parent.
                         par.autoajax('add_child', $this);
                     }
-                    else {
-                        methods.update_observables.apply($this);
-                    }
 
-                    // Set events.
+		    // We don't have a parent, meaning we are an independent
+		    // field. As such we need to update our observables
+		    // immediately.
+                    else
+                        methods.update_observables.apply($this);
+
+		    // We need KO options, disabled and value observables.
+		    data.disabled_obs = ko.add_disabled_observable($this);
+		    data.options_obs = ko.add_options_observable($this);
+		    data.value_obs = ko.add_value_observable($this);
+
+		    // Subscribe to the value observable so that when it changes
+		    // for any reason we can propagate to children.
                     if(!$this.event_set) {
                         $this.event_set = true;
-                        $this.change(function() {
-                            methods.changed.apply($this);
+		    	data.value_obs.subscribe(function() {
+		    	    methods.changed.apply($this);
+		    	    return true;
                         });
                     }
                 }
@@ -99,7 +124,7 @@
                     if(par_val)
                         methods.changed.apply(data.parent);
                     else
-                        $this.prop('disabled', true);
+			data.disabled_obs(true);
                 }
 	    });
 	},
@@ -111,10 +136,17 @@
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
-                // console.log('Changed: ' + $this.attr('id'));
-                if(data.children.length)
-                    methods.disable.apply($this);
-                methods.update.call($this, $this);
+
+		// If we're already processing a change, then don't
+		// restart another one.
+		// TODO: Handle this better, i.e. cancel existing update and
+		// start a new one.
+		if(!data.disabled) {
+                    // console.log('Changed: ' + $this.attr('id'));
+                    if(data.children.length)
+			methods.disable.apply($this);
+                    methods.update.call($this, $this);
+		}
 	    });
 	},
 
@@ -125,7 +157,6 @@
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
-                // console.log('Update: ' + $this.attr('id'));
                 methods.update_observables.apply($this);
                 for(var ii = 0; ii < data.children.length; ++ii)
                     methods.fetch.call(data.children[ii], source);
@@ -162,9 +193,10 @@
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
+
                 // console.log('Disable: ' + $this.attr('id'));
                 ++data.disabled;
-                $this.prop('disabled', true);
+		data.disabled_obs(true);
                 if((!direction || direction == 'from_child') && data.parent)
                     methods.disable.call(data.parent, 'from_child');
                 if(!direction || direction == 'from_parent') {
@@ -181,9 +213,10 @@
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
+
                 // console.log('Enable: ' + $this.attr('id'));
                 if(--data.disabled == 0)
-                    $this.prop('disabled', false);
+		    data.disabled_obs(false);
                 if((!direction || direction == 'from_child') && data.parent)
                     methods.enable.call(data.parent, 'from_child');
                 if(!direction || direction == 'from_parent') {
@@ -200,11 +233,18 @@
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
+
+		if(!data.parent)
+		    console.error('No parent set on child element, cannot fetch.');
+
+		// Get the parent value and check for empty. If empty, clear.
                 var pk = data.parent.val();
                 if(!pk) {
-                    $this.empty();
+                    data.options_obs([]);
                     return;
                 }
+
+		// AJAX part.
                 var url = data.url;
                 var send = {
                     pk: pk
@@ -213,14 +253,7 @@
                 // console.log('Added: ' + source.data('autoajax').disabled);
                 $.getJSON(url, send, function(result) {
                     content = result['content'];
-                    $this.empty();
-                    $.each(content, function(ii, obj) {
-                        var opt = $('<option>').text(obj.label).attr('value', obj.pk);
-                        if(obj.hasOwnProperty('observables'))
-                            opt.attr('data-observables', obj.observables);
-                        $this.append(opt);
-                    });
-                    $this.find('option').first().prop('selected', true);
+		    set_options_knockout($this, data, content);
                     methods.update.call($this, source);
                 }).fail(function() {
                     console.error('Failed to fetch dependencies.');
