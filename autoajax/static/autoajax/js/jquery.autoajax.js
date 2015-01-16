@@ -1,22 +1,23 @@
 (function($, undefined){
 
-    var set_options_knockout = function($this, data, content) {
-	var opts = $.map(content, function(obj) {
-            var opt = {
-		text: obj.label,
-		value: obj.pk,
-		attrs: []
-	    };
-            if(obj.hasOwnProperty('observables')) {
-	    	opt.attrs.push({
-	    	    name: 'data-observables',
-	    	    value: obj.observables
-	    	});
-	    }
-	    return opt;
-        });
-	data.options_obs(opts);
-    }
+    // var set_options_knockout = function($this, data, content) {
+    // 	var opts = $.map(content, function(obj) {
+    //         var opt = {
+    // 		label: obj.label,
+    // 		value: obj.pk,
+    // 		attrs: []
+    // 	    };
+    //         if(obj.hasOwnProperty('observables')) {
+    // 	    	opt.attrs.push({
+    // 	    	    name: 'data-observables',
+    // 	    	    value: obj.observables
+    // 	    	});
+    // 	    }
+    // 	    if(obj.hasOwnProperty
+    // 	    return opt;
+    //     });
+    // 	data.options_obs(opts);
+    // }
 
     var methods = {
 
@@ -170,7 +171,7 @@
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
-                var sel = $this.find(':selected');
+                var sel = $this.find('option:selected');
                 var obs = sel.attr('data-observables');
                 if(obs) {
                     obs = $.parseJSON($.parseJSON('"' + obs + '"'));
@@ -253,7 +254,8 @@
                 // console.log('Added: ' + source.data('autoajax').disabled);
                 $.getJSON(url, send, function(result) {
                     content = result['content'];
-		    set_options_knockout($this, data, content);
+		    data.options_obs(content);
+		    // set_options_knockout($this, data, content);
                     methods.update.call($this, source);
                 }).fail(function() {
                     console.error('Failed to fetch dependencies.');

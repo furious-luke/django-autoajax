@@ -8,8 +8,6 @@ from django.utils.translation import ugettext_lazy as _
 from django_ajax.decorators import ajax
 from .widgets import *
 
-import time
-
 __all__ = ['AutoAjaxField', 'DependentModelChoiceField', 'ObservableModelChoiceField',
            'AutoAjaxFormMixin']
 
@@ -29,7 +27,6 @@ class AutoAjaxField(object):
 
         @ajax
         def view(request, *args, **kwargs):
-            time.sleep(1);
             pk = request.GET.get('pk', None)
             if pk is None:
                 raise Http404
@@ -37,15 +34,22 @@ class AutoAjaxField(object):
             opts = []
             for o in objs:
                 opt = {}
-                opt['pk'] = o.pk
+                opt['value'] = o.pk
                 if self.label_field:
                     opt['label'] = str(getattr(o, self.label_field))
                 else:
                     opt['label'] = str(o)
+                if self.group_field:
+                    opt['group'] = str(getattr(o, self.group_field))
+                opt['attrs'] = {}
                 obs_dict = {}
                 for obs in self.observables:
                     obs_dict[obs] = getattr(o, obs)
-                opt['observables'] = escapejs(json.dumps(obs_dict, cls=json.encoder.JSONEncoderForHTML))
+                if obs_dict:
+                    opt['attrs'] = [{
+                        'name': 'data-observables',
+                        'value': escapejs(json.dumps(obs_dict, cls=json.encoder.JSONEncoderForHTML)),
+                    }]
                 opts.append(opt)
             return opts
 
@@ -65,6 +69,7 @@ class DependentModelChoiceField(AutoAjaxField, forms.ModelChoiceField):
         if self.filter is None:
             self.filter = self.parent
         self.label_field = kwargs.pop('label_field', None)
+        self.group_field = kwargs.pop('group_field', None)
         kwargs['queryset'] = self.model.objects.none()
         kwargs['empty_label'] = None
         widget = kwargs.get('widget', None)
