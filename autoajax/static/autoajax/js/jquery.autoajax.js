@@ -1,23 +1,16 @@
 (function($, undefined){
 
-    // var set_options_knockout = function($this, data, content) {
-    // 	var opts = $.map(content, function(obj) {
-    //         var opt = {
-    // 		label: obj.label,
-    // 		value: obj.pk,
-    // 		attrs: []
-    // 	    };
-    //         if(obj.hasOwnProperty('observables')) {
-    // 	    	opt.attrs.push({
-    // 	    	    name: 'data-observables',
-    // 	    	    value: obj.observables
-    // 	    	});
-    // 	    }
-    // 	    if(obj.hasOwnProperty
-    // 	    return opt;
-    //     });
-    // 	data.options_obs(opts);
-    // }
+    var reset_value = function(elem) {
+	var data = elem.data('autoajax');
+	BRAGI.log('autoajax:' + elem.attr('name'), 'Resetting value.', {
+	    current_value: elem.val(),
+	    previous_value: data.value_bak
+	});
+	elem.val(data.value_bak);
+	ko.tree.observable(elem, 'value')(data.value_bak);
+	if(data.parent)
+	    reset_value(data.parent);
+    }
 
     var methods = {
 
@@ -37,21 +30,24 @@
                         url: undefined,
                         disabled: 0,
                         event_set: false,
-                        vm: {},
-			local_vm: {}
+                        vm: {}
 	            }, options));
 	            data = $this.data('autoajax');
+
+		    BRAGI.log('autoajax:' + $this.attr('name'), 'Initializing AutoAjax: ', {
+			element: this,
+			url: data.url,
+		    });
 
                     // Store the URL.
                     data.url = $this.attr('data-url');
 
-                    // Produce a list of observables.
-                    var obs = $this.attr('data-observables');
-                    if(obs) {
-                        obs = obs.split(',');
-                        for(var ii = 0; ii < obs.length; ++ii)
-                            data.vm[$.trim(obs[ii])] = ko.observable();
-                    }
+		    // Backup the value immediately.
+		    data.value_bak = $this.val();
+
+		    // Before adding our observables to the element, be sure we
+		    // have created a VM on this element to hold our local values.
+		    data.vm = ko.tree.view_model($this);
 
                     // Find the parent field.
                     var par_name = $this.attr('data-parent-field');
@@ -71,25 +67,31 @@
 
                         // Add myself as a child of the parent.
                         par.autoajax('add_child', $this);
+
+			// Automatically disable the widget to prevent changes.
+			$this.prop('disabled', true);
                     }
 
-		    // We don't have a parent, meaning we are an independent
-		    // field. As such we need to update our observables
-		    // immediately.
-                    else
-                        methods.update_observables.apply($this);
-
 		    // We need KO options, disabled and value observables.
-		    data.disabled_obs = ko.add_disabled_observable($this);
-		    data.options_obs = ko.add_options_observable($this);
-		    data.value_obs = ko.add_value_observable($this);
+		    ko.tree.convert_input($this);
+		    data.disabled_obs = ko.tree.get_observable($this, 'disabled');
+		    data.options_obs = ko.tree.get_observable($this, 'options');
+		    data.value_obs = ko.tree.get_observable($this, 'value');
 
 		    // Subscribe to the value observable so that when it changes
 		    // for any reason we can propagate to children.
                     if(!$this.event_set) {
                         $this.event_set = true;
-		    	data.value_obs.subscribe(function() {
-		    	    methods.changed.apply($this);
+		    	data.value_obs.subscribe(function(val) {
+
+			    // Be sure this has actually changed. Sometimes at the start
+			    // this gets called for apparently no reason.
+			    if(val != data.value_bak) {
+				BRAGI.log('autoajax:' + $this.attr('name'), 'UI element has changed.');
+		    		methods.changed.call($this, val);
+			    }
+			    else
+			    	BRAGI.log('warning:autoajax:' + $this.attr('name'), 'Bogus UI element change.');
 		    	    return true;
                         });
                     }
@@ -118,14 +120,15 @@
                 var data = $this.data('autoajax');
 
                 // If the parent has a value, we must immediately query
-                // for the options. If not, we disable until such time as
-                // the parent does have a value.
+                // for the options.
                 if(data.parent) {
-                    var par_val = data.parent.val();
-                    if(par_val)
+		    var par_val = data.parent.val();
+		    if(par_val !== undefined && par_val !== null) {
+			BRAGI.log('autoajax:' + $this.attr('name'), 'Parent has initial value, calling `changed`.', {
+			    value: par_val
+			});
                         methods.changed.apply(data.parent);
-                    else
-			data.disabled_obs(true);
+		    }
                 }
 	    });
 	},
@@ -133,21 +136,24 @@
 	///
 	///
 	///
-	changed: function() {
+	changed: function(val) {
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
+		val = val || $this.val();
 
 		// If we're already processing a change, then don't
 		// restart another one.
 		// TODO: Handle this better, i.e. cancel existing update and
 		// start a new one.
 		if(!data.disabled) {
-                    // console.log('Changed: ' + $this.attr('id'));
+		    BRAGI.log('autoajax:' + $this.attr('name'), 'Change called.');
                     if(data.children.length)
 			methods.disable.apply($this);
                     methods.update.call($this, $this);
 		}
+		else
+		    BRAGI.log('autoajax:' + $this.attr('name'), 'Change ignored.');
 	    });
 	},
 
@@ -158,32 +164,10 @@
 	    return this.each(function() {
 		var $this = $(this);
 		var data = $this.data('autoajax');
-                methods.update_observables.apply($this);
+
+		BRAGI.log('autoajax:' + $this.attr('name'), 'Update called.');
                 for(var ii = 0; ii < data.children.length; ++ii)
                     methods.fetch.call(data.children[ii], source);
-	    });
-	},
-
-	///
-	///
-	///
-	update_observables: function() {
-	    return this.each(function() {
-		var $this = $(this);
-		var data = $this.data('autoajax');
-                var sel = $this.find('option:selected');
-                var obs = sel.attr('data-observables');
-                if(obs) {
-                    obs = $.parseJSON($.parseJSON('"' + obs + '"'));
-                    $.each(obs, function(key, val) {
-                        if(!data.vm.hasOwnProperty(key)) {
-                            console.error('No such observable: ' + key);
-                            return true;
-                        }
-                        data.vm[key](val);
-                        // console.log('Updated ' + key + ' to ' + val);
-                    });
-                }
 	    });
 	},
 
@@ -195,7 +179,7 @@
 		var $this = $(this);
 		var data = $this.data('autoajax');
 
-                // console.log('Disable: ' + $this.attr('id'));
+		BRAGI.log('autoajax:' + $this.attr('name'), 'Disabling, updated to: ', data.disabled + 1);
                 ++data.disabled;
 		data.disabled_obs(true);
                 if((!direction || direction == 'from_child') && data.parent)
@@ -215,9 +199,13 @@
 		var $this = $(this);
 		var data = $this.data('autoajax');
 
-                // console.log('Enable: ' + $this.attr('id'));
-                if(--data.disabled == 0)
+		BRAGI.log('autoajax:' + $this.attr('name'), 'Enabling, updated to: ', data.disabled - 1);
+                if(--data.disabled == 0) {
 		    data.disabled_obs(false);
+		    // Update the backup value here, because we have just finished
+		    // a round of updating.
+		    data.value_bak = $this.val();
+		}
                 if((!direction || direction == 'from_child') && data.parent)
                     methods.enable.call(data.parent, 'from_child');
                 if(!direction || direction == 'from_parent') {
@@ -251,14 +239,25 @@
                     pk: pk
                 };
                 ++source.data('autoajax').disabled;
-                // console.log('Added: ' + source.data('autoajax').disabled);
+		BRAGI.log('autoajax:' + $this.attr('name'), 'Requesting data from server: ', send);
+
+		// Peform the fetch.
                 $.getJSON(url, send, function(result) {
-                    content = result['content'];
-		    data.options_obs(content);
-		    // set_options_knockout($this, data, content);
-                    methods.update.call($this, source);
+		    content = result['content'];
+		    BRAGI.log('autoajax:' + $this.attr('name'), 'Data received: ', content);
+		    if(result.status != 200) {
+			BRAGI.log('autoajax:' + $this.attr('name'), 'AJAX transfer failed.');
+			console.error('Failed to complete AJAX transfer.');
+		    }
+		    else {
+			data.options_obs(content);
+			// set_options_knockout($this, data, content);
+			methods.update.call($this, source);
+		    }
                 }).fail(function() {
-                    console.error('Failed to fetch dependencies.');
+		    BRAGI.log('autoajax:' + $this.attr('name'), 'AJAX transfer failed.');
+		    console.error('Failed to complete AJAX transfer.');
+		    reset_value(data.parent);
                 }).always(function() {
                     // console.log('Del\'d: ' + (source.data('autoajax').disabled - 1));
                     if(--source.data('autoajax').disabled == 1)
@@ -298,7 +297,15 @@
 
 $(function() {
 
-    $('.autoajax').autoajax();
-    $('.autoajax').autoajax('initial');
+    // $('.autoajax').autoajax();
+
+});
+
+$(window).load(function() {
+
+    // // We can't test for initial parent values until here because
+    // // we need to wait for all children to be registered with their
+    // // parents.
+    // $('.autoajax').autoajax('initial');
 
 });
