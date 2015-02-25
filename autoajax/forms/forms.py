@@ -161,7 +161,7 @@ class ObservableMixin(object):
         return args, kwargs
 
     def prepare_value(self, value):
-        if value is not None:
+        if value is not None and value != '' and value != []:
             obs_dict = get_observables(self.observables, value) # dict([(o, getattr(value, o, '')) for o in self.observables])
         else:
             obs_dict = {}
