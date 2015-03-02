@@ -23,6 +23,8 @@ def get_observables(fields, obj):
         val = obj
         for lnk in links:
             val = getattr(val, lnk)
+            if callable(val):
+                val = val()
         obs_dict[name] = val
     return obs_dict
 
