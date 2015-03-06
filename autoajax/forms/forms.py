@@ -2,6 +2,7 @@ import inspect
 import simplejson as json
 from importlib import import_module
 from django import forms
+from django.db.models.query import QuerySet
 from django.http import Http404
 from django.utils.html import escapejs
 from django.utils.translation import ugettext_lazy as _
@@ -65,11 +66,21 @@ class AutoAjaxField(object):
         return decs
 
     def to_python(self, value):
+        old_qs = self.queryset
         self.queryset = self.model.objects.all()
         try:
             res = super(AutoAjaxField, self).to_python(value)
         finally:
-            self.queryset = self.model.objects.none()
+            self.queryset = old_qs
+        return res
+
+    def clean(self, *args, **kwargs):
+        old_qs = self.queryset
+        self.queryset = self.model.objects.all()
+        try:
+            res = super(AutoAjaxField, self).clean(*args, **kwargs)
+        finally:
+            self.queryset = old_qs
         return res
 
     def as_view(self):
@@ -189,6 +200,9 @@ class ObservableModelMultipleChoiceField(ObservableMixin, forms.ModelMultipleCho
 
 class AutoAjaxFormMixin(object):
 
+    # Custom AutoAjax cleaning. We need to validate that the selected
+    # choice of the dependent field is one of the possible choices of
+    # the parent field.
     def clean(self):
         cleaned_data = super(AutoAjaxFormMixin, self).clean()
         for bnd_field in self:
@@ -198,8 +212,16 @@ class AutoAjaxFormMixin(object):
                 par_pk = cleaned_data.get(field.parent, None)
                 if pk is None or par_pk is None:
                     continue
+                if not isinstance(pk, QuerySet):
+                    pk = [pk]
+                if callable(field.filter):
+                    possible = field.filter(field.model.objects.all(), par_pk)
                 try:
-                    obj = field.model.objects.get(**{field.filter: par_pk, 'pk': pk.pk})
+                    for p in pk:
+                        if callable(field.filter):
+                            obj = possible.filter(pk=p.pk)
+                        else:
+                            obj = field.model.objects.get(**{field.filter: par_pk, 'pk': p.pk})
                 except field.model.DoesNotExist:
                     err = forms.ValidationError(_('Not a valid choice'), code='invalid')
                     self.add_error(bnd_field.name, err)
