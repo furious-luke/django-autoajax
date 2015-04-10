@@ -250,8 +250,23 @@
 			console.error('Failed to complete AJAX transfer.');
 		    }
 		    else {
+
+                        // Set the options observable.
 			data.options_obs(content);
-			// set_options_knockout($this, data, content);
+
+                        // Check for the existence of initial values. If they're their, apply
+                        // them and delete the initial attribute.
+                        var init = $this.attr('autoajax-initial');
+                        if(init) {
+                            $this.removeAttr('autoajax-initial');
+                            init = init.split(',');
+                            if(init.length == 1)
+                                init = init[0];
+                            if(init)
+                                data.value_obs(init);
+                        }
+
+                        // Propagate to children.
 			methods.update.call($this, source);
 		    }
                 }).fail(function() {

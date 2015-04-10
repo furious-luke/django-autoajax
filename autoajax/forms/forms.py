@@ -1,4 +1,4 @@
-import inspect
+import inspect, six
 import simplejson as json
 from importlib import import_module
 from django import forms
@@ -23,7 +23,11 @@ def get_observables(fields, obj):
         links = fld.split('__')
         val = obj
         for lnk in links:
-            val = getattr(val, lnk)
+            try:
+                val = getattr(val, lnk)
+            except:
+                import pdb
+                pdb.set_trace()
             if callable(val):
                 val = val()
         obs_dict[name] = val
@@ -174,6 +178,11 @@ class ObservableMixin(object):
         return args, kwargs
 
     def prepare_value(self, value):
+
+        # Handle lists of values.
+        if hasattr(value, '__iter__') and not isinstance(value, six.text_type) and not hasattr(value, '_meta'):
+            return [self.prepare_value(v) for v in value]
+
         if value is not None and value != '' and value != []:
             obs_dict = get_observables(self.observables, value) # dict([(o, getattr(value, o, '')) for o in self.observables])
         else:

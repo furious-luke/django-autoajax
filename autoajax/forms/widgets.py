@@ -2,6 +2,7 @@ import simplejson as json
 from django import forms
 from django.utils.encoding import force_text
 from django.utils.html import format_html, escapejs
+from django.utils.safestring import mark_safe
 
 def list_observables(observables):
     obs_list = []
@@ -15,7 +16,18 @@ def list_observables(observables):
 def join_observables(observables):
     return ','.join(list_observables(observables))
 
-class DependentSelect(forms.Select):
+class AutoAjaxWidgetMixin(object):
+
+    def render(self, name, value, attrs=None):
+        if isinstance(value, (list, tuple)):
+            value = ','.join([str(v) for v in value])
+        elif value is not None:
+            value = value
+        if value not in (None, []):
+            attrs['autoajax-initial'] = value
+        return super(AutoAjaxWidgetMixin, self).render(name, None, attrs)
+
+class DependentSelect(AutoAjaxWidgetMixin, forms.Select):
 
     class Media:
         js = ('autoajax/js/jquery.autoajax.js',)
@@ -59,6 +71,22 @@ class ObservableMixin(object):
                            option_value,
                            selected_html,
                            force_text(option_label))
+
+    def render_options(self, choices, selected_choices):
+        if selected_choices is not None:
+            new_sel = []
+            for c in selected_choices:
+                if isinstance(c, (list, tuple)):
+                    new_sel.append(c[0])
+                else:
+                    new_sel.append(c)
+            selected_choices = new_sel
+        return super(ObservableMixin, self).render_options(choices, selected_choices)
+
+    # def render(self, *args, **kwargs):
+    #     import pdb
+    #     pdb.set_trace()
+    #     return super(ObservableMixin, self).render(*args, **kwargs)
 
 class ObservableSelect(ObservableMixin, forms.Select):
     pass
