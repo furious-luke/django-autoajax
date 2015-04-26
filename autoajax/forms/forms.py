@@ -23,11 +23,7 @@ def get_observables(fields, obj):
         links = fld.split('__')
         val = obj
         for lnk in links:
-            try:
-                val = getattr(val, lnk)
-            except:
-                import pdb
-                pdb.set_trace()
+            val = getattr(val, lnk)
             if callable(val):
                 val = val()
         obs_dict[name] = val
