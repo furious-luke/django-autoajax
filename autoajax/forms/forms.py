@@ -173,22 +173,22 @@ class ObservableMixin(object):
 
         return args, kwargs
 
-    def prepare_value(self, value):
+    # def prepare_value(self, value):
 
-        # Handle lists of values.
-        if hasattr(value, '__iter__') and not isinstance(value, six.text_type) and not hasattr(value, '_meta'):
-            return [self.prepare_value(v) for v in value]
+    #     # Handle lists of values.
+    #     if hasattr(value, '__iter__') and not isinstance(value, six.text_type) and not hasattr(value, '_meta'):
+    #         return [self.prepare_value(v) for v in value]
 
-        if value is not None and value != '' and value != []:
-            obs_dict = get_observables(self.observables, value) # dict([(o, getattr(value, o, '')) for o in self.observables])
-        else:
-            obs_dict = {}
-        if hasattr(value, '_meta'):
-            if self.to_field_name:
-                return (value.serializable_value(self.to_field_name), obs_dict)
-            else:
-                return (value.pk, obs_dict)
-        return (super(ObservableMixin, self).prepare_value(value), obs_dict)
+    #     if value is not None and value != '' and value != []:
+    #         obs_dict = get_observables(self.observables, value) # dict([(o, getattr(value, o, '')) for o in self.observables])
+    #     else:
+    #         obs_dict = {}
+    #     if hasattr(value, '_meta'):
+    #         if self.to_field_name:
+    #             return (value.serializable_value(self.to_field_name), obs_dict)
+    #         else:
+    #             return (value.pk, obs_dict)
+    #     return (super(ObservableMixin, self).prepare_value(value), obs_dict)
 
 class ObservableModelChoiceField(ObservableMixin, forms.ModelChoiceField):
 

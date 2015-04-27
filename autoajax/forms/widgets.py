@@ -50,43 +50,38 @@ class ObservableMixin(object):
         attrs['data-observables'] = join_observables(kwargs.pop('observables', []))
         super(ObservableMixin, self).__init__(*args, **kwargs)
 
-    def render_option(self, selected_choices, option_value, option_label):
-        option_value, obs_dict = option_value
-        if option_value is None:
-            option_value = ''
-        option_value = force_text(option_value)
-        if option_value in selected_choices:
-            selected_html = mark_safe(' selected="selected"')
-            if not self.allow_multiple_selected:
-                # Only allow for a single selection.
-                selected_choices.remove(option_value)
-        else:
-            selected_html = ''
-        if obs_dict:
-            observables = escapejs(json.dumps(obs_dict, cls=json.encoder.JSONEncoderForHTML))
-        else:
-            observables = ''
-        return format_html('<option data-observables="{}" value="{}"{}>{}</option>',
-                           observables,
-                           option_value,
-                           selected_html,
-                           force_text(option_label))
+    # def render_option(self, selected_choices, option_value, option_label):
+    #     option_value, obs_dict = option_value
+    #     if option_value is None:
+    #         option_value = ''
+    #     option_value = force_text(option_value)
+    #     if option_value in selected_choices:
+    #         selected_html = mark_safe(' selected="selected"')
+    #         if not self.allow_multiple_selected:
+    #             # Only allow for a single selection.
+    #             selected_choices.remove(option_value)
+    #     else:
+    #         selected_html = ''
+    #     if obs_dict:
+    #         observables = escapejs(json.dumps(obs_dict, cls=json.encoder.JSONEncoderForHTML))
+    #     else:
+    #         observables = ''
+    #     return format_html('<option data-observables="{}" value="{}"{}>{}</option>',
+    #                        observables,
+    #                        option_value,
+    #                        selected_html,
+    #                        force_text(option_label))
 
-    def render_options(self, choices, selected_choices):
-        if selected_choices is not None:
-            new_sel = []
-            for c in selected_choices:
-                if isinstance(c, (list, tuple)):
-                    new_sel.append(c[0])
-                else:
-                    new_sel.append(c)
-            selected_choices = new_sel
-        return super(ObservableMixin, self).render_options(choices, selected_choices)
-
-    # def render(self, *args, **kwargs):
-    #     import pdb
-    #     pdb.set_trace()
-    #     return super(ObservableMixin, self).render(*args, **kwargs)
+    # def render_options(self, choices, selected_choices):
+    #     if selected_choices is not None:
+    #         new_sel = []
+    #         for c in selected_choices:
+    #             if isinstance(c, (list, tuple)):
+    #                 new_sel.append(c[0])
+    #             else:
+    #                 new_sel.append(c)
+    #         selected_choices = new_sel
+    #     return super(ObservableMixin, self).render_options(choices, selected_choices)
 
 class ObservableSelect(ObservableMixin, forms.Select):
     pass
